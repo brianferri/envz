@@ -24,9 +24,7 @@ pub const Parsed = struct {
 const testing = std.testing;
 
 test "basic key-value" {
-    const env: ?Parsed = .line("BASIC=basic");
-    if (env) |e| {
-        try testing.expectEqualStrings("BASIC", e.key);
-        try testing.expectEqualStrings("basic", e.value);
-    }
+    const env = Parsed.line("BASIC=basic").?;
+    try testing.expectEqualStrings("BASIC", env.key);
+    try testing.expectEqualStrings("basic", env.value);
 }
