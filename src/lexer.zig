@@ -33,20 +33,16 @@ pub const Lexer = struct {
     }
 
     fn skipWhitespace(self: *Lexer) void {
-        while (self.advance()) |c| {
+        while (self.peek()) |c| : (self.position += 1) {
             if (!std.ascii.isWhitespace(c)) {
-                self.position -= 1;
-                break;
+                return;
             }
         }
     }
 
     fn readQuotedValue(self: *Lexer, quote: u8, start_pos: usize) []const u8 {
-        while (self.peek()) |c| {
-            _ = self.advance();
-            if (c == quote) {
-                break;
-            }
+        while (self.peek()) |c| : (self.position += 1) {
+            if (c == quote) break;
         }
         return self.input[start_pos..self.position];
     }
@@ -64,7 +60,7 @@ pub const Lexer = struct {
             '=' => return .{ .kind = .Equal, .lexeme = self.input[start..self.position] },
 
             '#' => {
-                while (self.peek()) |pc| : (_ = self.advance()) {
+                while (self.peek()) |pc| : (self.position += 1) {
                     if (pc == '\n') break;
                 }
                 return .{ .kind = .Comment, .lexeme = self.input[start..self.position] };
@@ -73,12 +69,12 @@ pub const Lexer = struct {
             '\n' => return .{ .kind = .Newline, .lexeme = "\n" },
 
             '"', '\'', '`' => {
-                const value = self.readQuotedValue(c, start);
+                const value = self.readQuotedValue(c, start + 1);
                 return .{ .kind = .Value, .lexeme = value };
             },
 
             else => {
-                while (self.peek()) |pc| : (_ = self.advance()) {
+                while (self.peek()) |pc| : (self.position += 1) {
                     if (pc == '=' or pc == '\n' or pc == '#' or pc == ' ' or pc == '\t')
                         break;
                 }
@@ -101,19 +97,15 @@ pub const Parsed = struct {
         const eq_token = lexer.next() orelse return null;
         if (eq_token.kind != .Equal) return null;
 
-        const val_token = lexer.next() orelse return .{ .key = std.mem.trim(u8, key_token.lexeme, " "), .value = "" };
+        const val_token = lexer.next() orelse return .{
+            .key = std.mem.trim(u8, key_token.lexeme, " "),
+            .value = "",
+        };
+
         if (val_token.kind != .Value and val_token.kind != .Key)
             return .{ .key = std.mem.trim(u8, key_token.lexeme, " "), .value = "" };
 
-        var value = std.mem.trim(u8, val_token.lexeme, " \t");
-
-        // Strip enclosing quotes if present
-        if ((value.len >= 2) and ((value[0] == '"' and value[value.len - 1] == '"') or
-            (value[0] == '\'' and value[value.len - 1] == '\'') or
-            (value[0] == '`' and value[value.len - 1] == '`')))
-        {
-            value = value[1 .. value.len - 1];
-        }
+        const value = std.mem.trim(u8, val_token.lexeme, " \t");
 
         return .{ .key = std.mem.trim(u8, key_token.lexeme, " \t"), .value = value };
     }
