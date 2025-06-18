@@ -1,5 +1,5 @@
 const std = @import("std");
-const Parsed = @import("./parser.zig").Parsed;
+const Parsed = @import("./lexer.zig").Parsed;
 
 const Env = @This();
 
@@ -44,7 +44,7 @@ pub fn print(self: Env) void {
 
 test "load comptime" {
     const file: []const u8 = @embedFile("env/.env");
-    @setEvalBranchQuota(file.len * 4);
+    @setEvalBranchQuota(100000);
 
     const env: Env = .loadComptime(file);
     env.print();
@@ -52,5 +52,11 @@ test "load comptime" {
 
 test "load from path comptime" {
     const env: Env = .loadFromPathComptime("env/.env");
+    env.print();
+}
+
+test "load multiline" {
+    @setEvalBranchQuota(100000);
+    const env: Env = .loadFromPathComptime("env/multiline.env");
     env.print();
 }
