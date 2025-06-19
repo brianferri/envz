@@ -12,6 +12,9 @@ pub const TokenType = enum {
     Comment,
     Newline,
     Eof,
+    DoubleQuoted,
+    SingleQuoted,
+    BacktickQuoted,
 };
 
 pub const Token = struct {
@@ -65,22 +68,31 @@ fn readKey(self: *Lexer, start: usize) []const u8 {
     return self.sliceFrom(start);
 }
 
-fn readValue(self: *Lexer) []const u8 {
-    const c = self.peek() orelse return "";
+fn readValue(self: *Lexer) Token {
+    const c = self.peek() orelse return .{ .kind = .Value, .lexeme = "" };
+
     if (c == '"' or c == '\'' or c == '`') {
         self.position += 1;
-        return self.readQuotedValue(c);
+        const lexeme = self.readQuotedValue(c);
+        return switch (c) {
+            '"' => .{ .kind = .DoubleQuoted, .lexeme = lexeme },
+            '\'' => .{ .kind = .SingleQuoted, .lexeme = lexeme },
+            '`' => .{ .kind = .BacktickQuoted, .lexeme = lexeme },
+            else => .{ .kind = .Value, .lexeme = lexeme },
+        };
     }
 
     const start = self.position;
-    return self.readUnquotedValue(start);
+    const lexeme = self.readUnquotedValue(start);
+    return .{ .kind = .Value, .lexeme = lexeme };
 }
 
 fn skipToEOL(self: *Lexer) []const u8 {
+    const start = self.position;
     while (self.peek()) |pc| : (self.position += 1) {
         if (pc == '\n') break;
     }
-    return "";
+    return self.sliceFrom(start);
 }
 
 pub fn next(self: *Lexer) ?Token {
@@ -88,11 +100,11 @@ pub fn next(self: *Lexer) ?Token {
 
     const start = self.position;
     return switch (self.advance() orelse return null) {
-        else => .{ .kind = .Key, .lexeme = self.readKey(start) },
         '=' => .{ .kind = .Equal, .lexeme = self.sliceFrom(start) },
         '#' => .{ .kind = .Comment, .lexeme = self.skipToEOL() },
         '\n' => .{ .kind = .Newline, .lexeme = "\n" },
-        '"', '\'', '`' => .{ .kind = .Value, .lexeme = self.readValue() },
+        '"', '\'', '`' => self.readValue(),
+        else => .{ .kind = .Key, .lexeme = self.readKey(start) },
     };
 }
 
@@ -102,5 +114,5 @@ pub fn nextValue(self: *Lexer) Token {
     if (self.position >= self.input.len)
         return .{ .kind = .Value, .lexeme = "" };
 
-    return .{ .kind = .Value, .lexeme = self.readValue() };
+    return self.readValue();
 }
