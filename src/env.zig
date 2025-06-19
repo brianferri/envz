@@ -7,7 +7,7 @@ map: std.StaticStringMap([]const u8) = undefined,
 
 pub fn loadComptime(comptime file: []const u8) Env {
     return .{
-        .map = Parser.parse(file),
+        .map = Parser.parseComptime(file),
     };
 }
 
