@@ -60,14 +60,13 @@ fn readUnquotedValue(self: *Lexer, start: usize) []const u8 {
 
 fn readKey(self: *Lexer, start: usize) []const u8 {
     while (self.peek()) |c| : (self.position += 1) {
-        if (c == '=' or c == '\n' or c == '#' or std.ascii.isWhitespace(c)) break;
+        if (c == '=' or c == '#' or std.ascii.isWhitespace(c)) break;
     }
     return self.sliceFrom(start);
 }
 
 fn readValue(self: *Lexer) []const u8 {
     const c = self.peek() orelse return "";
-
     if (c == '"' or c == '\'' or c == '`') {
         self.position += 1;
         return self.readQuotedValue(c);
