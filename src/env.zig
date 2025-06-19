@@ -1,5 +1,5 @@
 const std = @import("std");
-const Parsed = @import("./lexer.zig").Parsed;
+const Lexer = @import("./lexer.zig").Lexer;
 
 const Env = @This();
 
@@ -12,16 +12,27 @@ pub fn loadComptime(comptime file: []const u8) Env {
     return .{
         .map = comptime blk: {
             var kv_map: []KVMap = &.{};
-            var file_line_iterator = std.mem.splitScalar(u8, file, '\n');
-            while (file_line_iterator.next()) |line| {
-                if (Parsed.line(line)) |env_line| {
-                    const appended_kv_map = kv_map ++ .{.{
-                        env_line.key,
-                        env_line.value,
-                    }};
-                    kv_map = @constCast(appended_kv_map);
+            var lexer = Lexer.init(file);
+
+            while (true) {
+                const token = lexer.next() orelse break;
+
+                switch (token.kind) {
+                    .Eof => break,
+                    .Newline, .Comment => continue,
+                    .Key => {
+                        const eq_token = lexer.next() orelse break;
+                        if (eq_token.kind != .Equal) continue;
+
+                        const value_token = lexer.nextValue();
+
+                        const appended = kv_map ++ .{.{ token.lexeme, value_token.lexeme }};
+                        kv_map = @constCast(appended);
+                    },
+                    else => continue,
                 }
             }
+
             break :blk .initComptime(kv_map);
         },
     };
