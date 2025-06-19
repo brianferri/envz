@@ -1,40 +1,13 @@
 const std = @import("std");
-const Lexer = @import("./lexer.zig").Lexer;
+const Parser = @import("./parser.zig");
 
 const Env = @This();
 
-const KVMap = struct { []const u8, []const u8 };
-const EnvMap = std.StaticStringMap([]const u8);
-
-map: EnvMap = undefined,
+map: std.StaticStringMap([]const u8) = undefined,
 
 pub fn loadComptime(comptime file: []const u8) Env {
     return .{
-        .map = comptime blk: {
-            var kv_map: []KVMap = &.{};
-            var lexer = Lexer.init(file);
-
-            while (true) {
-                const token = lexer.next() orelse break;
-
-                switch (token.kind) {
-                    .Eof => break,
-                    .Newline, .Comment => continue,
-                    .Key => {
-                        const eq_token = lexer.next() orelse break;
-                        if (eq_token.kind != .Equal) continue;
-
-                        const value_token = lexer.nextValue();
-
-                        const appended = kv_map ++ .{.{ token.lexeme, value_token.lexeme }};
-                        kv_map = @constCast(appended);
-                    },
-                    else => continue,
-                }
-            }
-
-            break :blk .initComptime(kv_map);
-        },
+        .map = Parser.parse(file),
     };
 }
 
@@ -71,3 +44,4 @@ test "load multiline" {
     const env: Env = .loadFromPathComptime("env/multiline.env");
     env.print();
 }
+
