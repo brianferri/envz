@@ -70,7 +70,7 @@ fn readKey(self: *Lexer, start: usize) []const u8 {
 }
 
 fn readValue(self: *Lexer) Token {
-    const c = self.peek() orelse return .{ .kind = .Value, .lexeme = "" };
+    const c = self.peek() orelse return .{ .kind = .Eof, .lexeme = "" };
 
     if (c == '"' or c == '\'' or c == '`') {
         self.position += 1;
@@ -101,7 +101,7 @@ pub fn next(self: *Lexer) ?Token {
     self.skipWhitespace();
 
     const start = self.position;
-    return switch (self.advance() orelse return null) {
+    return switch (self.advance() orelse return .{ .kind = .Eof, .lexeme = "" }) {
         '=' => .{ .kind = .Equal, .lexeme = self.sliceFrom(start) },
         '#' => .{ .kind = .Comment, .lexeme = self.skipToEOL() },
         '\n' => .{ .kind = .Newline, .lexeme = "\n" },
