@@ -54,7 +54,8 @@ fn readQuotedValue(self: *Lexer, quote: u8) []const u8 {
     return self.sliceFrom(start);
 }
 
-fn readUnquotedValue(self: *Lexer, start: usize) []const u8 {
+fn readUnquotedValue(self: *Lexer) []const u8 {
+    const start = self.position;
     while (self.peek()) |c| : (self.position += 1) {
         if (c == '\n' or c == '#') break;
     }
@@ -74,17 +75,18 @@ fn readValue(self: *Lexer) Token {
     if (c == '"' or c == '\'' or c == '`') {
         self.position += 1;
         const lexeme = self.readQuotedValue(c);
-        return switch (c) {
-            '"' => .{ .kind = .DoubleQuoted, .lexeme = lexeme },
-            '\'' => .{ .kind = .SingleQuoted, .lexeme = lexeme },
-            '`' => .{ .kind = .BacktickQuoted, .lexeme = lexeme },
-            else => .{ .kind = .Value, .lexeme = lexeme },
-        };
+        return .{ .kind = switch (c) {
+            '"' => .DoubleQuoted,
+            '\'' => .SingleQuoted,
+            '`' => .BacktickQuoted,
+            else => unreachable,
+        }, .lexeme = lexeme };
     }
 
-    const start = self.position;
-    const lexeme = self.readUnquotedValue(start);
-    return .{ .kind = .Value, .lexeme = lexeme };
+    return .{
+        .kind = .Value,
+        .lexeme = std.mem.trim(u8, self.readUnquotedValue(), &std.ascii.whitespace),
+    };
 }
 
 fn skipToEOL(self: *Lexer) []const u8 {
@@ -110,9 +112,5 @@ pub fn next(self: *Lexer) ?Token {
 
 pub fn nextValue(self: *Lexer) Token {
     self.skipWhitespace();
-
-    if (self.position >= self.input.len)
-        return .{ .kind = .Value, .lexeme = "" };
-
     return self.readValue();
 }
