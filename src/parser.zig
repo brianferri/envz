@@ -1,5 +1,5 @@
 const std = @import("std");
-const Lexer = @import("./lexer.zig").Lexer;
+const Lexer = @import("./lexer.zig");
 
 const KV = struct { []const u8, []const u8 };
 
