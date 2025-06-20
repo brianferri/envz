@@ -3,8 +3,12 @@ const Lexer = @import("./lexer.zig");
 
 const KV = struct { []const u8, []const u8 };
 
+pub const ParserError = error{
+    InvalidToken,
+};
+
 /// Parses a `.env` file in to a `Static String Map`
-pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) {
+pub fn parseComptime(comptime file: []const u8) ParserError!std.StaticStringMap([]const u8) {
     return comptime blk: {
         var kv_map: []KV = &.{};
         var lexer: Lexer = .init(file);
@@ -12,15 +16,14 @@ pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) 
         while (lexer.next()) |token| {
             switch (token.kind) {
                 .Key => {
-                    if (lexer.next()) |eq| if (eq.kind != .Equal) continue;
+                    if (lexer.next()) |eq| if (eq.kind != .Equal)
+                        @compileError("InvalidToken: expected `" ++ @tagName(Lexer.TokenType.Equal) ++ "`, got `" ++ @tagName(eq.kind) ++ "`");
+
                     var value_token = lexer.nextValue();
-
-                    if (value_token.kind == .DoubleQuoted) {
+                    if (value_token.kind == .DoubleQuoted)
                         value_token.lexeme = processEscapesComptime(value_token.lexeme);
-                    }
 
-                    const appended = kv_map ++ .{.{ token.lexeme, value_token.lexeme }};
-                    kv_map = @constCast(appended);
+                    kv_map = @constCast(kv_map ++ .{.{ token.lexeme, value_token.lexeme }});
                 },
                 .Eof => break,
                 else => continue,

@@ -5,14 +5,14 @@ const Env = @This();
 
 map: std.StaticStringMap([]const u8) = undefined,
 
-pub fn loadComptime(comptime file: []const u8) Env {
+pub fn loadComptime(comptime file: []const u8) !Env {
     return .{
-        .map = Parser.parseComptime(file),
+        .map = try Parser.parseComptime(file),
     };
 }
 
-pub fn loadFromPathComptime(comptime path: []const u8) Env {
-    return loadComptime(@embedFile(path));
+pub fn loadFromPathComptime(comptime path: []const u8) !Env {
+    return try loadComptime(@embedFile(path));
 }
 
 pub fn get(self: Env, key: []const u8) ?[]const u8 {
@@ -28,9 +28,16 @@ pub fn print(self: Env) void {
 
 const testing = std.testing;
 
+//? https://github.com/ziglang/zig/issues/513
+// test "invalid env errors" {
+//     const env = Env.loadFromPathComptime("env/invalid.env");
+// 
+//     try testing.expectError(Parser.ParserError.InvalidToken, env);
+// }
+
 test "env: basic parsing" {
     @setEvalBranchQuota(10000);
-    const env = Env.loadFromPathComptime("env/.env");
+    const env = try Env.loadFromPathComptime("env/.env");
 
     std.debug.print("\n", .{});
     env.print();
@@ -82,7 +89,7 @@ test "env: basic parsing" {
 
 test "env: multiline parsing" {
     @setEvalBranchQuota(10000);
-    const env = Env.loadFromPathComptime("env/multiline.env");
+    const env = try Env.loadFromPathComptime("env/multiline.env");
 
     std.debug.print("\n", .{});
     env.print();
