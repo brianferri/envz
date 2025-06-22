@@ -7,8 +7,53 @@ pub const ParserError = error{
     InvalidToken,
 };
 
-/// Parses a `.env` file in to a `Static String Map`
-pub fn parseComptime(comptime file: []const u8) ParserError!std.StaticStringMap([]const u8) {
+pub fn parse(allocator: std.mem.Allocator, file: []const u8) !std.StaticStringMap([]const u8) {
+    var kv_map: std.ArrayList(KV) = .init(allocator);
+    var lexer: Lexer = .init(file);
+
+    while (lexer.next()) |token| {
+        switch (token.kind) {
+            .Key => {
+                if (lexer.next()) |eq| if (eq.kind != .Equal) return ParserError.InvalidToken;
+
+                var value_token = lexer.nextValue();
+                if (value_token.kind == .DoubleQuoted)
+                    value_token.lexeme = try processEscapes(value_token.lexeme, allocator);
+
+                try kv_map.append(.{ token.lexeme, value_token.lexeme });
+            },
+            .Eof => break,
+            else => continue,
+        }
+    }
+
+    return .init(try kv_map.toOwnedSlice(), allocator);
+}
+
+fn processEscapes(input: []const u8, allocator: std.mem.Allocator) ![]const u8 {
+    var out: std.ArrayList(u8) = .init(allocator);
+
+    var i: usize = 0;
+    while (i < input.len) : (i += 1) {
+        if (input[i] == '\\' and i + 1 < input.len) {
+            i += 1;
+            const c = input[i];
+            try out.append(switch (c) {
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                '"' => '\"',
+                else => c,
+            });
+        } else {
+            try out.append(input[i]);
+        }
+    }
+
+    return try out.toOwnedSlice();
+}
+
+pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) {
     return comptime blk: {
         var kv_map: []KV = &.{};
         var lexer: Lexer = .init(file);
