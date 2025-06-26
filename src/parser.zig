@@ -7,7 +7,11 @@ pub const ParserError = error{
     InvalidToken,
 };
 
-pub fn parse(allocator: std.mem.Allocator, file: []const u8) !std.StaticStringMap([]const u8) {
+pub fn parse(
+    allocator: std.mem.Allocator,
+    file: []const u8,
+    escaped_values: *std.ArrayList([]const u8),
+) !std.StaticStringMap([]const u8) {
     var kv_map: std.ArrayList(KV) = .init(allocator);
     var lexer: Lexer = .init(file);
 
@@ -17,8 +21,10 @@ pub fn parse(allocator: std.mem.Allocator, file: []const u8) !std.StaticStringMa
                 if (lexer.next()) |eq| if (eq.kind != .Equal) return ParserError.InvalidToken;
 
                 var value_token = lexer.nextValue();
-                if (value_token.kind == .DoubleQuoted)
+                if (value_token.kind == .DoubleQuoted) {
                     value_token.lexeme = try processEscapes(value_token.lexeme, allocator);
+                    try escaped_values.append(value_token.lexeme);
+                }
 
                 try kv_map.append(.{ token.lexeme, value_token.lexeme });
             },

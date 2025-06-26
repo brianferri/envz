@@ -4,18 +4,37 @@ const Parser = @import("./parser.zig");
 const Env = @This();
 
 map: std.StaticStringMap([]const u8) = undefined,
+allocator: std.mem.Allocator = undefined,
+escaped_values: ?std.ArrayList([]const u8) = null,
+file_buf: ?[]u8 = null,
 
-pub fn load(allocator: std.mem.Allocator, file: []const u8) !Env {
+pub fn load(allocator: std.mem.Allocator, file: []u8) !Env {
+    var escaped = std.ArrayList([]const u8).init(allocator);
+    const map = try Parser.parse(allocator, file, &escaped);
     return .{
-        .map = try Parser.parse(allocator, file),
+        .map = map,
+        .allocator = allocator,
+        .escaped_values = escaped,
+        .file_buf = file,
     };
 }
 
 pub fn loadFromPath(allocator: std.mem.Allocator, path: []const u8) !Env {
     const input_file = try std.fs.cwd().openFile(path, .{});
     defer input_file.close();
+
     const file = try input_file.stat();
-    return try load(allocator, try input_file.readToEndAlloc(allocator, file.size));
+    const buf = try input_file.readToEndAlloc(allocator, file.size);
+    return try load(allocator, buf);
+}
+
+pub fn deinit(self: *Env) void {
+    self.map.deinit(self.allocator);
+    if (self.file_buf) |buf| self.allocator.free(buf);
+    if (self.escaped_values) |*ev| {
+        for (ev.items) |ptr| self.allocator.free(ptr);
+        ev.deinit();
+    }
 }
 
 pub fn loadComptime(comptime file: []const u8) Env {
@@ -32,13 +51,6 @@ pub fn get(self: Env, key: []const u8) ?[]const u8 {
     return self.map.get(key);
 }
 
-pub fn print(self: Env) void {
-    const kv_map = self.map.kvs;
-    for (0..kv_map.len) |i| {
-        std.debug.print("{s}: {s}\n", .{ kv_map.keys[i], kv_map.values[i] });
-    }
-}
-
 const testing = std.testing;
 
 //? https://github.com/ziglang/zig/issues/513
@@ -51,9 +63,6 @@ const testing = std.testing;
 test "comptime env: basic parsing" {
     @setEvalBranchQuota(10000);
     const env = Env.loadFromPathComptime("env/.env");
-
-    std.debug.print("\n", .{});
-    env.print();
 
     try testing.expectEqualStrings("basic", env.get("BASIC").?);
     try testing.expectEqualStrings("after_line", env.get("AFTER_LINE").?);
@@ -104,9 +113,6 @@ test "comptime env: multiline parsing" {
     @setEvalBranchQuota(10000);
     const env = Env.loadFromPathComptime("env/multiline.env");
 
-    std.debug.print("\n", .{});
-    env.print();
-
     try testing.expectEqualStrings("basic", env.get("BASIC").?);
     try testing.expectEqualStrings("after_line", env.get("AFTER_LINE").?);
     try testing.expectEqualStrings("", env.get("EMPTY").?);
@@ -152,11 +158,8 @@ test "comptime env: multiline parsing" {
 }
 
 test "env: basic parsing" {
-    const env = try Env.loadFromPath(testing.allocator, "./src/env/.env");
-    defer env.map.deinit(testing.allocator);
-
-    std.debug.print("\n", .{});
-    env.print();
+    var env = try Env.loadFromPath(testing.allocator, "./src/env/.env");
+    defer env.deinit();
 
     try testing.expectEqualStrings("basic", env.get("BASIC").?);
     try testing.expectEqualStrings("after_line", env.get("AFTER_LINE").?);
@@ -204,11 +207,8 @@ test "env: basic parsing" {
 }
 
 test "env: multiline parsing" {
-    const env = try Env.loadFromPath(testing.allocator, "./src/env/multiline.env");
-    defer env.map.deinit(testing.allocator);
-
-    std.debug.print("\n", .{});
-    env.print();
+    var env = try Env.loadFromPath(testing.allocator, "./src/env/multiline.env");
+    defer env.deinit();
 
     try testing.expectEqualStrings("basic", env.get("BASIC").?);
     try testing.expectEqualStrings("after_line", env.get("AFTER_LINE").?);
