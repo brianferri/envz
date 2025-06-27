@@ -10,9 +10,10 @@ file_buf: ?[]u8 = null,
 
 pub fn load(allocator: std.mem.Allocator, file: []u8) !Env {
     var escaped = std.ArrayList([]const u8).init(allocator);
-    const map = try Parser.parse(allocator, file, &escaped);
+    const kv_slice = try Parser.parse(allocator, file, &escaped);
+    defer allocator.free(kv_slice); 
     return .{
-        .map = map,
+        .map = try .init(kv_slice, allocator),
         .allocator = allocator,
         .escaped_values = escaped,
         .file_buf = file,

@@ -11,7 +11,7 @@ pub fn parse(
     allocator: std.mem.Allocator,
     file: []const u8,
     escaped_values: *std.ArrayList([]const u8),
-) !std.StaticStringMap([]const u8) {
+) ![]KV {
     var kv_map: std.ArrayList(KV) = .init(allocator);
     var lexer: Lexer = .init(file);
 
@@ -33,7 +33,7 @@ pub fn parse(
         }
     }
 
-    return .init(try kv_map.toOwnedSlice(), allocator);
+    return try kv_map.toOwnedSlice();
 }
 
 fn processEscapes(input: []const u8, allocator: std.mem.Allocator) ![]const u8 {
