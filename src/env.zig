@@ -5,17 +5,14 @@ const Env = @This();
 
 map: std.StaticStringMap([]const u8) = undefined,
 allocator: std.mem.Allocator = undefined,
-escaped_values: ?std.ArrayList([]const u8) = null,
 file_buf: ?[]u8 = null,
 
 pub fn load(allocator: std.mem.Allocator, file: []u8) !Env {
-    var escaped = std.ArrayList([]const u8).init(allocator);
-    const kv_slice = try Parser.parse(allocator, file, &escaped);
+    const kv_slice = try Parser.parse(allocator, file);
     defer allocator.free(kv_slice); 
     return .{
         .map = try .init(kv_slice, allocator),
         .allocator = allocator,
-        .escaped_values = escaped,
         .file_buf = file,
     };
 }
@@ -30,12 +27,10 @@ pub fn loadFromPath(allocator: std.mem.Allocator, path: []const u8) !Env {
 }
 
 pub fn deinit(self: *Env) void {
+    for (self.map.values()) |val|
+        self.allocator.free(val);
     self.map.deinit(self.allocator);
     if (self.file_buf) |buf| self.allocator.free(buf);
-    if (self.escaped_values) |*ev| {
-        for (ev.items) |ptr| self.allocator.free(ptr);
-        ev.deinit();
-    }
 }
 
 pub fn loadComptime(comptime file: []const u8) Env {

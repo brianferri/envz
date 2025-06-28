@@ -7,11 +7,7 @@ pub const ParserError = error{
     InvalidToken,
 };
 
-pub fn parse(
-    allocator: std.mem.Allocator,
-    file: []const u8,
-    escaped_values: *std.ArrayList([]const u8),
-) ![]KV {
+pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
     var kv_map: std.ArrayList(KV) = .init(allocator);
     var lexer: Lexer = .init(file);
 
@@ -23,9 +19,11 @@ pub fn parse(
                 var value_token = lexer.nextValue();
                 if (value_token.kind == .DoubleQuoted) {
                     value_token.lexeme = try processEscapes(value_token.lexeme, allocator);
-                    try escaped_values.append(value_token.lexeme);
+                } else {
+                    var lexeme: std.ArrayList(u8) = .init(allocator);
+                    try lexeme.appendSlice(value_token.lexeme);
+                    value_token.lexeme = try lexeme.toOwnedSlice();
                 }
-
                 try kv_map.append(.{ token.lexeme, value_token.lexeme });
             },
             .Eof => break,
@@ -36,7 +34,7 @@ pub fn parse(
     return try kv_map.toOwnedSlice();
 }
 
-fn processEscapes(input: []const u8, allocator: std.mem.Allocator) ![]const u8 {
+fn processEscapes(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
     var out: std.ArrayList(u8) = .init(allocator);
 
     var i: usize = 0;
