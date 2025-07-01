@@ -17,10 +17,10 @@ pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
                 if (lexer.next()) |eq| if (eq.kind != .Equal) return ParserError.InvalidToken;
 
                 var value_token = lexer.nextValue();
-                if (value_token.kind == .DoubleQuoted)
-                    value_token.lexeme = try processEscapes(value_token.lexeme, allocator)
+                value_token.lexeme = if (value_token.kind == .DoubleQuoted)
+                    try processEscapes(value_token.lexeme, allocator)
                 else
-                    value_token.lexeme = try allocator.dupe(u8, value_token.lexeme);
+                    try allocator.dupe(u8, value_token.lexeme);
 
                 try kv_map.append(.{ token.lexeme, value_token.lexeme });
             },
