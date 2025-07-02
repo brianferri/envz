@@ -3,10 +3,6 @@ const Lexer = @import("./lexer.zig");
 
 const KV = struct { []const u8, []const u8 };
 
-pub const ParserError = error{
-    InvalidToken,
-};
-
 pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
     var kv_map: std.ArrayList(KV) = .init(allocator);
     var lexer: Lexer = .init(file);
@@ -14,7 +10,8 @@ pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
     while (lexer.next()) |token| {
         switch (token.kind) {
             .Key => {
-                if (lexer.next()) |eq| if (eq.kind != .Equal) return ParserError.InvalidToken;
+                if (lexer.next()) |eq| if (eq.kind != .Equal)
+                    @panic(try std.fmt.allocPrint(allocator, "InvalidToken: expected `" ++ @tagName(Lexer.TokenType.Equal) ++ "`, got `{s}`", .{@tagName(eq.kind)}));
 
                 var value_token = lexer.nextValue();
                 value_token.lexeme = if (value_token.kind == .DoubleQuoted)
