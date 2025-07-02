@@ -9,7 +9,7 @@ file_buf: ?[]u8 = null,
 
 pub fn load(allocator: std.mem.Allocator, file: []u8) !Env {
     const kv_slice = try Parser.parse(allocator, file);
-    defer allocator.free(kv_slice); 
+    defer allocator.free(kv_slice);
     return .{
         .map = try .init(kv_slice, allocator),
         .allocator = allocator,
