@@ -17,6 +17,10 @@ pub fn load(allocator: std.mem.Allocator, file: []u8) !Env {
     };
 }
 
+pub fn loadComptime(comptime file: []const u8) Env {
+    return .{ .map = Parser.parseComptime(file) };
+}
+
 pub fn loadFromPath(allocator: std.mem.Allocator, path: []const u8) !Env {
     const input_file = try std.fs.cwd().openFile(path, .{});
     defer input_file.close();
@@ -26,21 +30,15 @@ pub fn loadFromPath(allocator: std.mem.Allocator, path: []const u8) !Env {
     return try load(allocator, buf);
 }
 
+pub fn loadFromPathComptime(comptime path: []const u8) Env {
+    return loadComptime(@embedFile(path));
+}
+
 pub fn deinit(self: *Env) void {
     for (self.map.values()) |val|
         self.allocator.free(val);
     self.map.deinit(self.allocator);
     if (self.file_buf) |buf| self.allocator.free(buf);
-}
-
-pub fn loadComptime(comptime file: []const u8) Env {
-    return .{
-        .map = Parser.parseComptime(file),
-    };
-}
-
-pub fn loadFromPathComptime(comptime path: []const u8) Env {
-    return loadComptime(@embedFile(path));
 }
 
 pub fn get(self: Env, key: []const u8) ?[]const u8 {

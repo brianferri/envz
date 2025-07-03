@@ -29,29 +29,6 @@ pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
     return try kv_map.toOwnedSlice();
 }
 
-fn processEscapes(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
-    var out: std.ArrayList(u8) = .init(allocator);
-
-    var i: usize = 0;
-    while (i < input.len) : (i += 1) {
-        if (input[i] == '\\' and i + 1 < input.len) {
-            i += 1;
-            const c = input[i];
-            try out.append(switch (c) {
-                'n' => '\n',
-                'r' => '\r',
-                't' => '\t',
-                '"' => '\"',
-                else => c,
-            });
-        } else {
-            try out.append(input[i]);
-        }
-    }
-
-    return try out.toOwnedSlice();
-}
-
 pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) {
     return comptime blk: {
         var kv_map: []KV = &.{};
@@ -76,6 +53,29 @@ pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) 
 
         break :blk .initComptime(kv_map);
     };
+}
+
+fn processEscapes(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
+    var out: std.ArrayList(u8) = .init(allocator);
+
+    var i: usize = 0;
+    while (i < input.len) : (i += 1) {
+        if (input[i] == '\\' and i + 1 < input.len) {
+            i += 1;
+            const c = input[i];
+            try out.append(switch (c) {
+                'n' => '\n',
+                'r' => '\r',
+                't' => '\t',
+                '"' => '\"',
+                else => c,
+            });
+        } else {
+            try out.append(input[i]);
+        }
+    }
+
+    return try out.toOwnedSlice();
 }
 
 fn processEscapesComptime(input: []const u8) []const u8 {
