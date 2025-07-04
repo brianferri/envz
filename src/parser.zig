@@ -55,6 +55,16 @@ pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) 
     };
 }
 
+fn escape(c: u8) u8 {
+    return switch (c) {
+        'n' => '\n',
+        'r' => '\r',
+        't' => '\t',
+        '"' => '\"',
+        else => c,
+    };
+}
+
 fn processEscapes(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
     var out: std.ArrayList(u8) = .init(allocator);
 
@@ -63,13 +73,7 @@ fn processEscapes(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
         if (input[i] == '\\' and i + 1 < input.len) {
             i += 1;
             const c = input[i];
-            try out.append(switch (c) {
-                'n' => '\n',
-                'r' => '\r',
-                't' => '\t',
-                '"' => '\"',
-                else => c,
-            });
+            try out.append(escape(c));
         } else {
             try out.append(input[i]);
         }
@@ -86,13 +90,7 @@ fn processEscapesComptime(input: []const u8) []const u8 {
         if (input[i] == '\\' and i + 1 < input.len) {
             i += 1;
             const c = input[i];
-            out = @constCast(out ++ &[1]u8{switch (c) {
-                'n' => '\n',
-                'r' => '\r',
-                't' => '\t',
-                '"' => '\"',
-                else => c,
-            }});
+            out = @constCast(out ++ &[1]u8{escape(c)});
         } else {
             out = @constCast(out ++ &[1]u8{input[i]});
         }
