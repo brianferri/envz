@@ -15,7 +15,7 @@ pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
 
                 var value_token = lexer.nextValue();
                 value_token.lexeme = if (value_token.kind == .DoubleQuoted)
-                    try processEscapes(value_token.lexeme, allocator)
+                    try processDoubleQuotedString(value_token.lexeme, allocator)
                 else
                     try allocator.dupe(u8, value_token.lexeme);
 
@@ -42,7 +42,7 @@ pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) 
 
                     var value_token = lexer.nextValue();
                     if (value_token.kind == .DoubleQuoted)
-                        value_token.lexeme = processEscapesComptime(value_token.lexeme);
+                        value_token.lexeme = processDoubleQuotedStringComptime(value_token.lexeme);
 
                     kv_map = @constCast(kv_map ++ .{.{ token.lexeme, value_token.lexeme }});
                 },
@@ -65,7 +65,7 @@ fn escape(c: u8) u8 {
     };
 }
 
-fn processEscapes(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
+fn processDoubleQuotedString(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
     var out: std.ArrayList(u8) = .init(allocator);
 
     var i: usize = 0;
@@ -82,7 +82,7 @@ fn processEscapes(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
     return try out.toOwnedSlice();
 }
 
-fn processEscapesComptime(input: []const u8) []const u8 {
+fn processDoubleQuotedStringComptime(input: []const u8) []const u8 {
     var out: []u8 = &.{};
 
     var i: usize = 0;
