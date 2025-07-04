@@ -26,6 +26,13 @@ pub fn init(input: []const u8) Lexer {
     return .{ .input = input };
 }
 
+pub fn expect(self: *Lexer, expected_type: TokenType) bool {
+    return if (self.next()) |token|
+        token.kind == expected_type
+    else
+        false;
+}
+
 fn peek(self: *Lexer) ?u8 {
     return if (self.position < self.input.len) self.input[self.position] else null;
 }

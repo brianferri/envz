@@ -50,8 +50,7 @@ const testing = std.testing;
 //? https://github.com/ziglang/zig/issues/513
 // test "invalid env errors" {
 //     const env = Env.loadFromPathComptime("env/invalid.env");
-//
-//     try testing.expectError(Parser.ParserError.InvalidToken, env);
+//     _ = env;
 // }
 
 test "comptime env: basic parsing" {

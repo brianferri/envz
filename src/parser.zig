@@ -10,8 +10,8 @@ pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
     while (lexer.next()) |token| {
         switch (token.kind) {
             .Key => {
-                if (lexer.next()) |eq| if (eq.kind != .Equal)
-                    @panic(try std.fmt.allocPrint(allocator, "InvalidToken: expected `" ++ @tagName(Lexer.TokenType.Equal) ++ "`, got `{s}`", .{@tagName(eq.kind)}));
+                if (!lexer.expect(.Equal))
+                    @panic("InvalidToken: expected `" ++ @tagName(Lexer.TokenType.Equal) ++ "`");
 
                 var value_token = lexer.nextValue();
                 value_token.lexeme = if (value_token.kind == .DoubleQuoted)
@@ -37,8 +37,8 @@ pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) 
         while (lexer.next()) |token| {
             switch (token.kind) {
                 .Key => {
-                    if (lexer.next()) |eq| if (eq.kind != .Equal)
-                        @compileError("InvalidToken: expected `" ++ @tagName(Lexer.TokenType.Equal) ++ "`, got `" ++ @tagName(eq.kind) ++ "`");
+                    if (!lexer.expect(.Equal))
+                        @compileError("InvalidToken: expected `" ++ @tagName(Lexer.TokenType.Equal) ++ "`");
 
                     var value_token = lexer.nextValue();
                     if (value_token.kind == .DoubleQuoted)
@@ -74,9 +74,7 @@ fn processDoubleQuotedString(input: []const u8, allocator: std.mem.Allocator) ![
             i += 1;
             const c = input[i];
             try out.append(escape(c));
-        } else {
-            try out.append(input[i]);
-        }
+        } else try out.append(input[i]);
     }
 
     return try out.toOwnedSlice();
@@ -91,9 +89,7 @@ fn processDoubleQuotedStringComptime(input: []const u8) []const u8 {
             i += 1;
             const c = input[i];
             out = @constCast(out ++ &[1]u8{escape(c)});
-        } else {
-            out = @constCast(out ++ &[1]u8{input[i]});
-        }
+        } else out = @constCast(out ++ &[1]u8{input[i]});
     }
 
     return @constCast(out);
