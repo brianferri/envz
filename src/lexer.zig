@@ -79,20 +79,25 @@ fn readKey(self: *Lexer, start: usize) []const u8 {
 fn readValue(self: *Lexer) Token {
     const c = self.peek() orelse return .{ .kind = .Eof, .lexeme = "" };
 
-    if (c == '"' or c == '\'' or c == '`') {
-        self.position += 1;
-        const lexeme = self.readQuotedValue(c);
-        return .{ .kind = switch (c) {
-            '"' => .DoubleQuoted,
-            '\'' => .SingleQuoted,
-            '`' => .BacktickQuoted,
-            else => unreachable,
-        }, .lexeme = lexeme };
-    }
+    self.position += 1;
+    const kind: TokenType = switch (c) {
+        '"' => .DoubleQuoted,
+        '\'' => .SingleQuoted,
+        '`' => .BacktickQuoted,
+        else => blk: {
+            self.position -= 1;
+            break :blk .Value;
+        },
+    };
+
+    const lexeme = switch (kind) {
+        .DoubleQuoted, .SingleQuoted, .BacktickQuoted => self.readQuotedValue(c),
+        else => std.mem.trim(u8, self.readUnquotedValue(), &std.ascii.whitespace),
+    };
 
     return .{
-        .kind = .Value,
-        .lexeme = std.mem.trim(u8, self.readUnquotedValue(), &std.ascii.whitespace),
+        .kind = kind,
+        .lexeme = lexeme,
     };
 }
 
@@ -109,10 +114,10 @@ pub fn next(self: *Lexer) ?Token {
 
     const start = self.position;
     return switch (self.advance() orelse return .{ .kind = .Eof, .lexeme = "" }) {
-        '=' => .{ .kind = .Equal, .lexeme = self.sliceFrom(start) },
-        '#' => .{ .kind = .Comment, .lexeme = self.skipToEOL() },
+        '=' => .{ .kind = .Equal, .lexeme = "=" },
         '\n' => .{ .kind = .Newline, .lexeme = "\n" },
         '"', '\'', '`' => self.readValue(),
+        '#' => .{ .kind = .Comment, .lexeme = self.skipToEOL() },
         else => .{ .kind = .Key, .lexeme = self.readKey(start) },
     };
 }
