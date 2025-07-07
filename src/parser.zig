@@ -9,19 +9,19 @@ pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
 
     while (lexer.next()) |token| {
         switch (token.kind) {
-            .Key => {
-                if (!lexer.expect(.Equal))
-                    @panic("InvalidToken: expected `" ++ @tagName(Lexer.TokenType.Equal) ++ "`");
+            .key => {
+                if (!lexer.expect(.equal))
+                    @panic("InvalidToken: expected `" ++ @tagName(Lexer.TokenType.equal) ++ "`");
 
                 var value_token = lexer.nextValue();
-                value_token.lexeme = if (value_token.kind == .DoubleQuoted)
+                value_token.lexeme = if (value_token.kind == .double_quoted)
                     try processDoubleQuotedString(value_token.lexeme, allocator)
                 else
                     try allocator.dupe(u8, value_token.lexeme);
 
                 try kv_map.append(.{ token.lexeme, value_token.lexeme });
             },
-            .Eof => break,
+            .eof => break,
             else => continue,
         }
     }
@@ -36,17 +36,17 @@ pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) 
 
         while (lexer.next()) |token| {
             switch (token.kind) {
-                .Key => {
-                    if (!lexer.expect(.Equal))
-                        @compileError("InvalidToken: expected `" ++ @tagName(Lexer.TokenType.Equal) ++ "`");
+                .key => {
+                    if (!lexer.expect(.equal))
+                        @compileError("InvalidToken: expected `" ++ @tagName(Lexer.TokenType.equal) ++ "`");
 
                     var value_token = lexer.nextValue();
-                    if (value_token.kind == .DoubleQuoted)
+                    if (value_token.kind == .double_quoted)
                         value_token.lexeme = processDoubleQuotedStringComptime(value_token.lexeme);
 
                     kv_map = @constCast(kv_map ++ .{.{ token.lexeme, value_token.lexeme }});
                 },
-                .Eof => break,
+                .eof => break,
                 else => continue,
             }
         }

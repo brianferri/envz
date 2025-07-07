@@ -6,15 +6,15 @@ input: []const u8,
 position: usize = 0,
 
 pub const TokenType = enum {
-    Key,
-    Equal,
-    Value,
-    Comment,
-    Newline,
-    Eof,
-    DoubleQuoted,
-    SingleQuoted,
-    BacktickQuoted,
+    key,
+    equal,
+    value,
+    comment,
+    newline,
+    eof,
+    double_quoted,
+    single_quoted,
+    backtick_quoted,
 };
 
 pub const Token = struct {
@@ -77,21 +77,21 @@ fn readKey(self: *Lexer, start: usize) []const u8 {
 }
 
 fn readValue(self: *Lexer) Token {
-    const c = self.peek() orelse return .{ .kind = .Eof, .lexeme = "" };
+    const c = self.peek() orelse return .{ .kind = .eof, .lexeme = "" };
 
     self.position += 1;
     const kind: TokenType = switch (c) {
-        '"' => .DoubleQuoted,
-        '\'' => .SingleQuoted,
-        '`' => .BacktickQuoted,
+        '"' => .double_quoted,
+        '\'' => .single_quoted,
+        '`' => .backtick_quoted,
         else => blk: {
             self.position -= 1;
-            break :blk .Value;
+            break :blk .value;
         },
     };
 
     const lexeme = switch (kind) {
-        .DoubleQuoted, .SingleQuoted, .BacktickQuoted => self.readQuotedValue(c),
+        .double_quoted, .single_quoted, .backtick_quoted => self.readQuotedValue(c),
         else => std.mem.trim(u8, self.readUnquotedValue(), &std.ascii.whitespace),
     };
 
@@ -113,12 +113,12 @@ pub fn next(self: *Lexer) ?Token {
     self.skipWhitespace();
 
     const start = self.position;
-    return switch (self.advance() orelse return .{ .kind = .Eof, .lexeme = "" }) {
-        '=' => .{ .kind = .Equal, .lexeme = "=" },
-        '\n' => .{ .kind = .Newline, .lexeme = "\n" },
+    return switch (self.advance() orelse return .{ .kind = .eof, .lexeme = "" }) {
+        '=' => .{ .kind = .equal, .lexeme = "=" },
+        '\n' => .{ .kind = .newline, .lexeme = "\n" },
         '"', '\'', '`' => self.readValue(),
-        '#' => .{ .kind = .Comment, .lexeme = self.skipToEOL() },
-        else => .{ .kind = .Key, .lexeme = self.readKey(start) },
+        '#' => .{ .kind = .comment, .lexeme = self.skipToEOL() },
+        else => .{ .kind = .key, .lexeme = self.readKey(start) },
     };
 }
 
