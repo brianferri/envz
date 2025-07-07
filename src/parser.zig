@@ -60,7 +60,6 @@ fn escape(c: u8) u8 {
         'n' => '\n',
         'r' => '\r',
         't' => '\t',
-        '"' => '\"',
         else => c,
     };
 }
@@ -81,16 +80,16 @@ fn processDoubleQuotedString(input: []const u8, allocator: std.mem.Allocator) ![
 }
 
 fn processDoubleQuotedStringComptime(input: []const u8) []const u8 {
-    var out: []u8 = &.{};
+    var out: []const u8 = &.{};
 
     var i: usize = 0;
     while (i < input.len) : (i += 1) {
         if (input[i] == '\\' and i + 1 < input.len) {
             i += 1;
             const c = input[i];
-            out = @constCast(out ++ &[1]u8{escape(c)});
-        } else out = @constCast(out ++ &[1]u8{input[i]});
+            out = out ++ &[1]u8{escape(c)};
+        } else out = out ++ &[1]u8{input[i]};
     }
 
-    return @constCast(out);
+    return out;
 }
