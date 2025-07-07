@@ -1,5 +1,5 @@
 const std = @import("std");
-const Parser = @import("./parser.zig");
+const parser = @import("./parser.zig");
 
 const Env = @This();
 
@@ -8,7 +8,7 @@ allocator: std.mem.Allocator = undefined,
 file_buf: ?[]u8 = null,
 
 pub fn load(allocator: std.mem.Allocator, file: []u8) !Env {
-    const kv_slice = try Parser.parse(allocator, file);
+    const kv_slice = try parser.parse(allocator, file);
     defer allocator.free(kv_slice);
     return .{
         .map = try .init(kv_slice, allocator),
@@ -18,7 +18,7 @@ pub fn load(allocator: std.mem.Allocator, file: []u8) !Env {
 }
 
 pub fn loadComptime(comptime file: []const u8) Env {
-    return .{ .map = Parser.parseComptime(file) };
+    return .{ .map = parser.parseComptime(file) };
 }
 
 pub fn loadFromPath(allocator: std.mem.Allocator, path: []const u8) !Env {
@@ -49,13 +49,13 @@ const testing = std.testing;
 
 //? https://github.com/ziglang/zig/issues/513
 // test "invalid env errors" {
-//     const env = Env.loadFromPathComptime("env/invalid.env");
+//     const env = loadFromPathComptime("env/invalid.env");
 //     _ = env;
 // }
 
-test "comptime env: basic parsing" {
+test loadFromPathComptime {
     @setEvalBranchQuota(10000);
-    const env = Env.loadFromPathComptime("env/.env");
+    const env = loadFromPathComptime("env/.env");
 
     try testing.expectEqualStrings("basic", env.get("BASIC").?);
     try testing.expectEqualStrings("after_line", env.get("AFTER_LINE").?);
@@ -102,9 +102,9 @@ test "comptime env: basic parsing" {
     try testing.expectEqualStrings("parsed", env.get("SPACED_KEY").?);
 }
 
-test "comptime env: multiline parsing" {
+test "loadFromPathComptime.Multiline" {
     @setEvalBranchQuota(10000);
-    const env = Env.loadFromPathComptime("env/multiline.env");
+    const env = loadFromPathComptime("env/multiline.env");
 
     try testing.expectEqualStrings("basic", env.get("BASIC").?);
     try testing.expectEqualStrings("after_line", env.get("AFTER_LINE").?);
@@ -150,8 +150,8 @@ test "comptime env: multiline parsing" {
     try testing.expectEqualStrings(env.get("MULTI_PEM_DOUBLE_QUOTED").?[0..26], "-----BEGIN PUBLIC KEY-----");
 }
 
-test "env: basic parsing" {
-    var env = try Env.loadFromPath(testing.allocator, "./src/env/.env");
+test loadFromPath {
+    var env = try loadFromPath(testing.allocator, "./src/env/.env");
     defer env.deinit();
 
     try testing.expectEqualStrings("basic", env.get("BASIC").?);
@@ -199,8 +199,8 @@ test "env: basic parsing" {
     try testing.expectEqualStrings("parsed", env.get("SPACED_KEY").?);
 }
 
-test "env: multiline parsing" {
-    var env = try Env.loadFromPath(testing.allocator, "./src/env/multiline.env");
+test "loadFromPath.Multiline" {
+    var env = try loadFromPath(testing.allocator, "./src/env/multiline.env");
     defer env.deinit();
 
     try testing.expectEqualStrings("basic", env.get("BASIC").?);
