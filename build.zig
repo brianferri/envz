@@ -18,10 +18,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(lib);
 
     const install_docs = b.addInstallDirectory(.{
-        .source_dir = b.addLibrary(.{
-            .name = lib.name,
-            .root_module = lib_mod,
-        }).getEmittedDocs(),
+        .source_dir = lib.getEmittedDocs(),
         .install_dir = .prefix,
         .install_subdir = "docs",
     });
