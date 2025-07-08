@@ -77,9 +77,8 @@ fn readKey(self: *Lexer, start: usize) []const u8 {
 }
 
 fn readValue(self: *Lexer) Token {
-    const c = self.peek() orelse return .{ .kind = .eof, .lexeme = "" };
+    const c = self.advance() orelse return .{ .kind = .eof, .lexeme = "" };
 
-    self.position += 1;
     const kind: TokenType = switch (c) {
         '"' => .double_quoted,
         '\'' => .single_quoted,
