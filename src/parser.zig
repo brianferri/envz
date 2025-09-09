@@ -4,7 +4,7 @@ const Lexer = @import("./lexer.zig");
 const KV = struct { []const u8, []const u8 };
 
 pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
-    var kv_map: std.ArrayList(KV) = .init(allocator);
+    var kv_map: std.ArrayList(KV) = .empty;
     var lexer: Lexer = .init(file);
 
     while (lexer.next()) |token| {
@@ -19,14 +19,14 @@ pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
                 else
                     try allocator.dupe(u8, value_token.lexeme);
 
-                try kv_map.append(.{ token.lexeme, value_token.lexeme });
+                try kv_map.append(allocator, .{ token.lexeme, value_token.lexeme });
             },
             .eof => break,
             else => continue,
         }
     }
 
-    return try kv_map.toOwnedSlice();
+    return try kv_map.toOwnedSlice(allocator);
 }
 
 pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) {
@@ -65,18 +65,18 @@ fn escape(c: u8) u8 {
 }
 
 fn processDoubleQuotedString(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
-    var out: std.ArrayList(u8) = .init(allocator);
+    var out: std.ArrayList(u8) = .empty;
 
     var i: usize = 0;
     while (i < input.len) : (i += 1) {
         if (input[i] == '\\' and i + 1 < input.len) {
             i += 1;
             const c = input[i];
-            try out.append(escape(c));
-        } else try out.append(input[i]);
+            try out.append(allocator, escape(c));
+        } else try out.append(allocator, input[i]);
     }
 
-    return try out.toOwnedSlice();
+    return try out.toOwnedSlice(allocator);
 }
 
 fn processDoubleQuotedStringComptime(input: []const u8) []const u8 {
