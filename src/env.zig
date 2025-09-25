@@ -26,8 +26,13 @@ pub fn loadFromPath(allocator: std.mem.Allocator, path: []const u8) !Env {
     defer input_file.close();
 
     const file = try input_file.stat();
-    const buf = try input_file.readToEndAlloc(allocator, file.size);
-    return try load(allocator, buf);
+    var buffer = try allocator.alloc(u8, file.size);
+    errdefer allocator.destroy(&buffer);
+
+    var file_reader = input_file.reader(buffer);
+    try file_reader.interface.readSliceAll(buffer);
+
+    return try load(allocator, buffer);
 }
 
 pub fn loadFromPathComptime(comptime path: []const u8) Env {
