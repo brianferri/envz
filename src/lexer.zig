@@ -48,9 +48,9 @@ fn skipWhitespaces(self: *Lexer) void {
 }
 
 fn readQuotedValue(self: *Lexer, quote: u8) []const u8 {
-    const start = self.position;
     // ! After slicing we consume the trailing quote char
     defer self.position += 1;
+    const start = self.position;
 
     while (self.peek()) |c| : (self.position += 1) {
         if (c == quote) break;
@@ -59,7 +59,10 @@ fn readQuotedValue(self: *Lexer, quote: u8) []const u8 {
 }
 
 fn readUnquotedValue(self: *Lexer) []const u8 {
+    // ! We need to backtrack to not consume the first char
+    self.position -= 1;
     const start = self.position;
+
     while (self.peek()) |c| : (self.position += 1) {
         if (c == '\n' or c == '#') break;
     }
@@ -90,12 +93,7 @@ fn readValue(self: *Lexer) Token {
         '`' => |c| .{ .kind = .backtick_quote, .lexeme = self.readQuotedValue(c) },
         else => .{
             .kind = .value,
-            .lexeme = out: {
-                // ? If we're reading an unquoted value we need to backtrack
-                // ? to not skip the first character
-                self.position -= 1;
-                break :out std.mem.trim(u8, self.readUnquotedValue(), &std.ascii.whitespace);
-            },
+            .lexeme = std.mem.trim(u8, self.readUnquotedValue(), &std.ascii.whitespace),
         },
     };
 }
@@ -105,7 +103,6 @@ fn readString(self: *Lexer, is_value: bool) ?Token {
 }
 
 pub fn next(self: *Lexer, expect: ?TokenType) ?Token {
-    // * In `.env` whitespaces between tokens are skipped
     self.skipWhitespaces();
     return switch (self.peek() orelse
         return .{ .kind = .eof, .lexeme = "" }) {
