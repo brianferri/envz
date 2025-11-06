@@ -12,9 +12,9 @@ pub const TokenType = enum {
     comment,
     newline,
     eof,
-    double_quoted,
-    single_quoted,
-    backtick_quoted,
+    double_quote,
+    single_quote,
+    backtick_quote,
 };
 
 pub const Token = struct {
@@ -24,13 +24,6 @@ pub const Token = struct {
 
 pub fn init(input: []const u8) Lexer {
     return .{ .input = input };
-}
-
-pub fn expect(self: *Lexer, expected_type: TokenType) bool {
-    return if (self.next()) |token|
-        token.kind == expected_type
-    else
-        false;
 }
 
 fn peek(self: *Lexer) ?u8 {
@@ -47,14 +40,18 @@ fn sliceFrom(self: *Lexer, start: usize) []const u8 {
     return self.input[start..self.position];
 }
 
-fn skipWhitespace(self: *Lexer) void {
+fn skipWhitespaces(self: *Lexer) void {
     while (self.peek()) |c| : (self.position += 1) {
+        // ? newlines are valid tokens, so we break before consuming them
         if (!std.ascii.isWhitespace(c) or c == '\n') return;
     }
 }
 
 fn readQuotedValue(self: *Lexer, quote: u8) []const u8 {
     const start = self.position;
+    // ! After slicing we consume the trailing quote char
+    defer self.position += 1;
+
     while (self.peek()) |c| : (self.position += 1) {
         if (c == quote) break;
     }
@@ -69,37 +66,6 @@ fn readUnquotedValue(self: *Lexer) []const u8 {
     return self.sliceFrom(start);
 }
 
-fn readKey(self: *Lexer, start: usize) []const u8 {
-    while (self.peek()) |c| : (self.position += 1) {
-        if (c == '=' or c == '#' or std.ascii.isWhitespace(c)) break;
-    }
-    return self.sliceFrom(start);
-}
-
-fn readValue(self: *Lexer) Token {
-    const c = self.advance() orelse return .{ .kind = .eof, .lexeme = "" };
-
-    const kind: TokenType = switch (c) {
-        '"' => .double_quoted,
-        '\'' => .single_quoted,
-        '`' => .backtick_quoted,
-        else => blk: {
-            self.position -= 1;
-            break :blk .value;
-        },
-    };
-
-    const lexeme = switch (kind) {
-        .double_quoted, .single_quoted, .backtick_quoted => self.readQuotedValue(c),
-        else => std.mem.trim(u8, self.readUnquotedValue(), &std.ascii.whitespace),
-    };
-
-    return .{
-        .kind = kind,
-        .lexeme = lexeme,
-    };
-}
-
 fn skipToEOL(self: *Lexer) []const u8 {
     const start = self.position;
     while (self.peek()) |pc| : (self.position += 1) {
@@ -108,20 +74,47 @@ fn skipToEOL(self: *Lexer) []const u8 {
     return self.sliceFrom(start);
 }
 
-pub fn next(self: *Lexer) ?Token {
-    self.skipWhitespace();
-
+fn readKey(self: *Lexer) []const u8 {
     const start = self.position;
-    return switch (self.advance() orelse return .{ .kind = .eof, .lexeme = "" }) {
-        '=' => .{ .kind = .equal, .lexeme = "=" },
-        '\n' => .{ .kind = .newline, .lexeme = "\n" },
-        '"', '\'', '`' => self.readValue(),
-        '#' => .{ .kind = .comment, .lexeme = self.skipToEOL() },
-        else => .{ .kind = .key, .lexeme = self.readKey(start) },
+    while (self.peek()) |c| : (self.position += 1) {
+        if (c == '=' or c == '#' or std.ascii.isWhitespace(c)) break;
+    }
+    return self.sliceFrom(start);
+}
+
+fn readValue(self: *Lexer) Token {
+    return switch (self.advance() orelse
+        return .{ .kind = .eof, .lexeme = "" }) {
+        '"' => |c| .{ .kind = .double_quote, .lexeme = self.readQuotedValue(c) },
+        '\'' => |c| .{ .kind = .single_quote, .lexeme = self.readQuotedValue(c) },
+        '`' => |c| .{ .kind = .backtick_quote, .lexeme = self.readQuotedValue(c) },
+        else => .{
+            .kind = .value,
+            .lexeme = out: {
+                // ? If we're reading an unquoted value we need to backtrack
+                // ? to not skip the first character
+                self.position -= 1;
+                break :out std.mem.trim(u8, self.readUnquotedValue(), &std.ascii.whitespace);
+            },
+        },
     };
 }
 
-pub fn nextValue(self: *Lexer) Token {
-    self.skipWhitespace();
-    return self.readValue();
+fn readString(self: *Lexer, is_value: bool) ?Token {
+    return if (is_value) self.readValue() else .{ .kind = .key, .lexeme = self.readKey() };
+}
+
+pub fn next(self: *Lexer, expect: ?TokenType) ?Token {
+    // * In `.env` whitespaces between tokens are skipped
+    self.skipWhitespaces();
+    return switch (self.peek() orelse
+        return .{ .kind = .eof, .lexeme = "" }) {
+        '#' => .{ .kind = .comment, .lexeme = self.skipToEOL() },
+        '=' => |c| .{ .kind = .equal, .lexeme = &.{self.advance() orelse c} },
+        '\n' => |c| .{ .kind = .newline, .lexeme = &.{self.advance() orelse c} },
+        else => self.readString(
+            // ? Scan for `.key`s if not explicitly requested otherwise
+            if (expect) |expected| expected == .value else false,
+        ),
+    };
 }

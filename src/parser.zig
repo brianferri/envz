@@ -7,22 +7,46 @@ pub fn parse(allocator: std.mem.Allocator, file: []const u8) ![]KV {
     var kv_map: std.ArrayList(KV) = .empty;
     var lexer: Lexer = .init(file);
 
-    while (lexer.next()) |token| {
+    while (lexer.next(null)) |token| {
         switch (token.kind) {
             .key => {
-                if (!lexer.expect(.equal))
-                    @panic("InvalidToken: expected `" ++ @tagName(Lexer.TokenType.equal) ++ "`");
-
-                var value_token = lexer.nextValue();
-                value_token.lexeme = if (value_token.kind == .double_quoted)
-                    try processDoubleQuotedString(value_token.lexeme, allocator)
-                else
-                    try allocator.dupe(u8, value_token.lexeme);
-
-                try kv_map.append(allocator, .{ token.lexeme, value_token.lexeme });
+                if (lexer.next(null)) |next_token| if (next_token.kind != .equal)
+                    @panic(try std.fmt.allocPrint(
+                        allocator,
+                        "InvalidToken: expected `{s}`, got `{s}`",
+                        .{
+                            @tagName(Lexer.TokenType.equal),
+                            @tagName(next_token.kind),
+                        },
+                    ));
+                if (lexer.next(.value)) |value| {
+                    const lexeme = switch (value.kind) {
+                        .value,
+                        .single_quote,
+                        .backtick_quote,
+                        => try allocator.dupe(u8, value.lexeme),
+                        .double_quote,
+                        => try processDoubleQuoteString(value.lexeme, allocator),
+                        .comment, .newline, .eof => "",
+                        else => @panic(try std.fmt.allocPrint(
+                            allocator,
+                            "InvalidToken: expected `{s}`, got `{s}`",
+                            .{
+                                @tagName(Lexer.TokenType.value),
+                                @tagName(value.kind),
+                            },
+                        )),
+                    };
+                    try kv_map.append(allocator, .{ token.lexeme, lexeme });
+                }
             },
             .eof => break,
-            else => continue,
+            .comment, .newline => continue,
+            else => @panic(try std.fmt.allocPrint(
+                allocator,
+                "UnexpectedToken: `{s}`",
+                .{@tagName(token.kind)},
+            )),
         }
     }
 
@@ -34,20 +58,43 @@ pub fn parseComptime(comptime file: []const u8) std.StaticStringMap([]const u8) 
         var kv_map: []KV = &.{};
         var lexer: Lexer = .init(file);
 
-        while (lexer.next()) |token| {
+        while (lexer.next(null)) |token| {
             switch (token.kind) {
                 .key => {
-                    if (!lexer.expect(.equal))
-                        @compileError("InvalidToken: expected `" ++ @tagName(Lexer.TokenType.equal) ++ "`");
-
-                    var value_token = lexer.nextValue();
-                    if (value_token.kind == .double_quoted)
-                        value_token.lexeme = processDoubleQuotedStringComptime(value_token.lexeme);
-
-                    kv_map = @constCast(kv_map ++ .{.{ token.lexeme, value_token.lexeme }});
+                    if (lexer.next(null)) |next_token| if (next_token.kind != .equal)
+                        @compileError(std.fmt.comptimePrint(
+                            "InvalidToken: expected `{s}`, got `{s}`",
+                            .{
+                                @tagName(Lexer.TokenType.equal),
+                                @tagName(next_token.kind),
+                            },
+                        ));
+                    if (lexer.next(.value)) |value| {
+                        const lexeme = switch (value.kind) {
+                            .value,
+                            .single_quote,
+                            .backtick_quote,
+                            => value.lexeme,
+                            .double_quote,
+                            => processDoubleQuoteStringComptime(value.lexeme),
+                            .comment, .newline, .eof => "",
+                            else => @compileError(std.fmt.comptimePrint(
+                                "InvalidToken: expected `{s}`, got `{s}`",
+                                .{
+                                    @tagName(Lexer.TokenType.value),
+                                    @tagName(value.kind),
+                                },
+                            )),
+                        };
+                        kv_map = @constCast(kv_map ++ .{.{ token.lexeme, lexeme }});
+                    }
                 },
                 .eof => break,
-                else => continue,
+                .comment, .newline => continue,
+                else => @compileError(std.fmt.comptimePrint(
+                    "UnexpectedToken: `{s}`",
+                    .{@tagName(token.kind)},
+                )),
             }
         }
 
@@ -64,7 +111,7 @@ fn escape(c: u8) u8 {
     };
 }
 
-fn processDoubleQuotedString(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
+fn processDoubleQuoteString(input: []const u8, allocator: std.mem.Allocator) ![]u8 {
     var out: std.ArrayList(u8) = .empty;
 
     var i: usize = 0;
@@ -79,7 +126,7 @@ fn processDoubleQuotedString(input: []const u8, allocator: std.mem.Allocator) ![
     return try out.toOwnedSlice(allocator);
 }
 
-fn processDoubleQuotedStringComptime(input: []const u8) []const u8 {
+fn processDoubleQuoteStringComptime(input: []const u8) []const u8 {
     var out: []const u8 = &.{};
 
     var i: usize = 0;
